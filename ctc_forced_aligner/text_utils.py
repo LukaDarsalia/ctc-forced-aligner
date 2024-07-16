@@ -194,7 +194,7 @@ def split_text(text: str, split_size: str = "word"):
 
 
 def preprocess_text(
-    text, romanize, language, split_size="word", star_frequency="segment"
+        text, romanize, language, split_size="word", star_frequency="segment", n_words=1
 ):
     assert split_size in [
         "sentence",
@@ -207,7 +207,18 @@ def preprocess_text(
     ], "Star frequency must be segment or edges"
     if language in ["jpn", "chi"]:
         split_size = "char"
-    text_split = split_text(text, split_size)
+
+    # Modified split_text function
+    def split_text(text, split_size, n_words):
+        if split_size == "sentence":
+            return re.split(r'(?<=[.!?])\s+', text)
+        elif split_size == "word":
+            words = text.split()
+            return [' '.join(words[i:i + n_words]) for i in range(0, len(words), n_words)]
+        elif split_size == "char":
+            return list(text)
+
+    text_split = split_text(text, split_size, n_words)
     norm_text = [text_normalize(line.strip(), language) for line in text_split]
 
     if romanize:
@@ -216,16 +227,11 @@ def preprocess_text(
         tokens = [" ".join(list(word)) for word in norm_text]
 
     # add <star> token to the tokens and text
-    # it's used extensively here but I found that it produces more accurate results
-    # and doesn't affect the runtime
     if star_frequency == "segment":
-
         tokens_starred = []
         [tokens_starred.extend(["<star>", token]) for token in tokens]
-
         text_starred = []
         [text_starred.extend(["<star>", chunk]) for chunk in text_split]
-
     elif star_frequency == "edges":
         tokens_starred = ["<star>"] + tokens + ["<star>"]
         text_starred = ["<star>"] + text_split + ["<star>"]
@@ -268,3 +274,4 @@ def postprocess_results(
 
     merge_segments(results, merge_threshold)
     return results
+
